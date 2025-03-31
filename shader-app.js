@@ -388,7 +388,13 @@ class ShaderGenerator {
       this.rays,
       this.tunnel,
       this.noise,
-      this.cells
+      this.cells,
+      this.geometricPatterns,
+     this.fractalNoise,
+     this.fluidSimulation,
+     this.kaleidoscope,
+     this.warpSpeed,
+     this.mixedPattern
     ];
   }
   
