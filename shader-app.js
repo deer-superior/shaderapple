@@ -686,7 +686,7 @@ fluidSimulation() {
       color += vec3(detail);
       
       gl_FragColor = vec4(color, 1.0);
-    }
+    
   `;
 },
 
