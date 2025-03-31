@@ -381,7 +381,7 @@ class ShaderRenderer {
 // GLSL Shader Generator
 class ShaderGenerator {
   constructor() {
-    this.complexityLevel = 3; // 1-5 scale of complexity
+    this.complexityLevel = 3;
     this.patterns = [
       this.colorGradient,
       this.plasma,
@@ -390,14 +390,14 @@ class ShaderGenerator {
       this.noise,
       this.cells,
       this.geometricPatterns,
-     this.fractalNoise,
-     this.fluidSimulation,
-     this.kaleidoscope,
-     this.warpSpeed,
-     this.mixedPattern
+      this.fractalNoise,
+      this.fluidSimulation,
+      this.kaleidoscope,
+      this.warpSpeed,
+      this.mixedPattern
     ];
-  }
-  
+  }  
+
   // Generate a random shader
   generate() {
     const selectedPattern = this.patterns[Math.floor(Math.random() * this.patterns.length)];
@@ -1058,6 +1058,114 @@ warpSpeed() {
       }
     `;
   }
+}
+
+mixedPattern() {
+  // Pick two random patterns to combine
+  const availablePatterns = [
+    this.plasma,
+    this.noise,
+    this.rays,
+    this.tunnel,
+    this.fractalNoise,
+    this.geometricPatterns,
+    this.fluidSimulation
+  ];
+  
+  // Pick two different patterns
+  const index1 = Math.floor(Math.random() * availablePatterns.length);
+  let index2 = Math.floor(Math.random() * (availablePatterns.length - 1));
+  if (index2 >= index1) index2++;
+  
+  // Generate shader code for both patterns
+  const pattern1 = availablePatterns[index1].call(this);
+  const pattern2 = availablePatterns[index2].call(this);
+  
+  // Extract the main functions from each pattern
+  const extractMainBody = (shaderCode) => {
+    const mainStart = shaderCode.indexOf('void main()');
+    const mainBody = shaderCode.substring(
+      shaderCode.indexOf('{', mainStart) + 1,
+      shaderCode.lastIndexOf('}')
+    );
+    return mainBody;
+  };
+  
+  // Extract function declarations and uniforms from both patterns
+  const extractFunctions = (shaderCode) => {
+    const mainStart = shaderCode.indexOf('void main()');
+    return shaderCode.substring(0, mainStart).trim();
+  };
+  
+  const functions1 = extractFunctions(pattern1);
+  const functions2 = extractFunctions(pattern2);
+  const mainBody1 = extractMainBody(pattern1);
+  const mainBody2 = extractMainBody(pattern2);
+  
+  // Combine the patterns with a blend parameter
+  const mixMethod = Math.floor(Math.random() * 3); // 0, 1, or 2 for different mix methods
+  const mixSpeed = (Math.random() * 0.002 + 0.001).toFixed(4);
+  
+  // Create combined shader
+  return `
+    precision mediump float;
+    uniform float time;
+    uniform vec2 resolution;
+    
+    // Combined function declarations from both patterns
+    ${functions1}
+    
+    // Additional functions from pattern 2
+    ${functions2.replace('precision mediump float;', '')
+               .replace('uniform float time;', '')
+               .replace('uniform vec2 resolution;', '')}
+    
+    // Function to get colors from both patterns
+    vec4 pattern1(vec2 uv, float t) {
+      // Local variables for pattern 1
+      vec4 color;
+      ${mainBody1.replace('gl_FragColor =', 'color =')}
+      return color;
+    }
+    
+    vec4 pattern2(vec2 uv, float t) {
+      // Local variables for pattern 2
+      vec4 color;
+      ${mainBody2.replace('gl_FragColor =', 'color =')}
+      return color;
+    }
+    
+    void main() {
+      vec2 uv = gl_FragCoord.xy / resolution.xy;
+      float t = time * 0.001;
+      
+      // Get colors from both patterns
+      vec4 color1 = pattern1(uv, t);
+      vec4 color2 = pattern2(uv, t);
+      
+      // Mix based on different methods
+      vec4 finalColor;
+      
+      ${mixMethod === 0 ? `
+      // Method 1: Smooth time oscillation
+      float mixFactor = sin(t * ${mixSpeed} * 10.0) * 0.5 + 0.5;
+      finalColor = mix(color1, color2, mixFactor);
+      ` : mixMethod === 1 ? `
+      // Method 2: Spatial pattern
+      float mixFactor = sin(uv.x * 10.0 + t) * sin(uv.y * 10.0 + t * 0.7) * 0.5 + 0.5;
+      finalColor = mix(color1, color2, mixFactor);
+      ` : `
+      // Method 3: Blend modes
+      // Screen blend
+      finalColor = 1.0 - (1.0 - color1) * (1.0 - color2);
+      // Apply some time variation to the blend strength
+      float blendStrength = sin(t * ${mixSpeed} * 5.0) * 0.3 + 0.7;
+      finalColor = mix(color1, finalColor, blendStrength);
+      `}
+      
+      gl_FragColor = finalColor;
+    }
+
 }
 
 // Initialize app when DOM is loaded
