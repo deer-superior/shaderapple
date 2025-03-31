@@ -8,7 +8,7 @@ const ShaderApp = {
 
   // Initialize the application
   init() {
-    this.setupDOM();
+    this.canvas = document.getElementById('shader-canvas');
     this.setupWebGL();
     this.urlHandler = new URLHandler();
     
@@ -23,37 +23,7 @@ const ShaderApp = {
     
     this.setupEventListeners();
     this.startRenderLoop();
-  },
-  
-  // Create DOM elements
-  setupDOM() {
-    this.canvas = document.createElement('canvas');
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
-    this.canvas.style.position = 'absolute';
-    this.canvas.style.top = '0';
-    this.canvas.style.left = '0';
-    document.body.appendChild(this.canvas);
-    
-    // Create UI controls
-    const controls = document.createElement('div');
-    controls.style.position = 'fixed';
-    controls.style.bottom = '20px';
-    controls.style.left = '20px';
-    controls.style.zIndex = '100';
-    
-    const newButton = document.createElement('button');
-    newButton.textContent = 'New Shader';
-    newButton.id = 'new-shader';
-    controls.appendChild(newButton);
-    
-    const shareButton = document.createElement('button');
-    shareButton.textContent = 'Copy Link';
-    shareButton.id = 'copy-link';
-    shareButton.style.marginLeft = '10px';
-    controls.appendChild(shareButton);
-    
-    document.body.appendChild(controls);
+    this.setupResizeHandler();
   },
   
   // Initialize WebGL
@@ -65,31 +35,50 @@ const ShaderApp = {
       this.renderer = new ShaderRenderer(gl, this.canvas);
     } catch (error) {
       console.error('WebGL initialization failed:', error);
-      this.showError('WebGL is not supported in your browser');
+      this.showNotification('WebGL is not supported in your browser', 'error');
     }
   },
   
   // Set up event listeners
   setupEventListeners() {
-    window.addEventListener('resize', () => {
-      this.canvas.width = window.innerWidth;
-      this.canvas.height = window.innerHeight;
-      this.renderer.resize(window.innerWidth, window.innerHeight);
-    });
-    
     document.getElementById('new-shader').addEventListener('click', () => {
       this.generateRandomShader();
+    });
+    
+    document.getElementById('random-colors').addEventListener('click', () => {
+      this.randomizeColors();
+    });
+    
+    document.getElementById('apply-shader').addEventListener('click', () => {
+      this.applyEditedShader();
     });
     
     document.getElementById('copy-link').addEventListener('click', () => {
       navigator.clipboard.writeText(window.location.href)
         .then(() => {
-          alert('Link copied to clipboard!');
+          this.showNotification('Link copied to clipboard!');
         })
         .catch(err => {
           console.error('Could not copy link:', err);
+          this.showNotification('Failed to copy link', 'error');
         });
     });
+  },
+  
+  // Handle window resizing
+  setupResizeHandler() {
+    window.addEventListener('resize', () => {
+      const canvasContainer = this.canvas.parentElement;
+      this.canvas.width = canvasContainer.clientWidth;
+      this.canvas.height = canvasContainer.clientHeight;
+      this.renderer.resize(this.canvas.width, this.canvas.height);
+    });
+    
+    // Initial resize
+    const canvasContainer = this.canvas.parentElement;
+    this.canvas.width = canvasContainer.clientWidth;
+    this.canvas.height = canvasContainer.clientHeight;
+    this.renderer.resize(this.canvas.width, this.canvas.height);
   },
   
   // Generate a new random shader
@@ -100,14 +89,67 @@ const ShaderApp = {
     this.shader = newShader;
     this.renderer.setShader(newShader);
     
+    document.getElementById('current-shader').value = newShader;
+    document.getElementById('editable-shader').value = newShader;
+    
     const compressedShader = this.urlHandler.compressShader(newShader);
     this.urlHandler.updateURL(compressedShader);
+    
+    this.showNotification('New shader generated');
+  },
+  
+  // Randomize colors in the current shader
+  randomizeColors() {
+    const currentShader = document.getElementById('current-shader').value;
+    
+    // Find and replace color values in the shader
+    const colorRegex = /vec3\s*\(\s*([0-9]*\.[0-9]+|[0-9]+)\s*,\s*([0-9]*\.[0-9]+|[0-9]+)\s*,\s*([0-9]*\.[0-9]+|[0-9]+)\s*\)/g;
+    
+    const randomizedShader = currentShader.replace(colorRegex, () => {
+      const r = Math.random().toFixed(1);
+      const g = Math.random().toFixed(1);
+      const b = Math.random().toFixed(1);
+      return `vec3(${r}, ${g}, ${b})`;
+    });
+    
+    // Apply the shader with new colors
+    this.shader = randomizedShader;
+    this.renderer.setShader(randomizedShader);
+    
+    document.getElementById('current-shader').value = randomizedShader;
+    document.getElementById('editable-shader').value = randomizedShader;
+    
+    const compressedShader = this.urlHandler.compressShader(randomizedShader);
+    this.urlHandler.updateURL(compressedShader);
+    
+    this.showNotification('Colors randomized');
+  },
+  
+  // Apply changes from editable shader
+  applyEditedShader() {
+    const editedShader = document.getElementById('editable-shader').value;
+    
+    try {
+      this.renderer.setShader(editedShader);
+      this.shader = editedShader;
+      document.getElementById('current-shader').value = editedShader;
+      
+      const compressedShader = this.urlHandler.compressShader(editedShader);
+      this.urlHandler.updateURL(compressedShader);
+      
+      this.showNotification('Shader applied successfully');
+    } catch (error) {
+      console.error('Error applying shader:', error);
+      this.showNotification('Error compiling shader: ' + error.message, 'error');
+    }
   },
   
   // Load shader from URL
   loadShaderFromURL(shaderCode) {
     this.shader = shaderCode;
     this.renderer.setShader(shaderCode);
+    document.getElementById('current-shader').value = shaderCode;
+    document.getElementById('editable-shader').value = shaderCode;
   },
   
   // Animation loop
@@ -120,20 +162,21 @@ const ShaderApp = {
     requestAnimationFrame(animate);
   },
   
-  // Display error message
-  showError(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.textContent = message;
-    errorDiv.style.position = 'absolute';
-    errorDiv.style.top = '50%';
-    errorDiv.style.left = '50%';
-    errorDiv.style.transform = 'translate(-50%, -50%)';
-    errorDiv.style.color = 'white';
-    errorDiv.style.background = 'rgba(255, 0, 0, 0.8)';
-    errorDiv.style.padding = '20px';
-    errorDiv.style.borderRadius = '5px';
+  // Display notification
+  showNotification(message, type = 'info') {
+    const notification = document.getElementById('notification');
+    notification.textContent = message;
+    notification.className = 'notification show';
     
-    document.body.appendChild(errorDiv);
+    if (type === 'error') {
+      notification.style.backgroundColor = 'rgba(180, 30, 30, 0.8)';
+    } else {
+      notification.style.backgroundColor = 'rgba(30, 30, 30, 0.8)';
+    }
+    
+    setTimeout(() => {
+      notification.className = 'notification';
+    }, 3000);
   }
 };
 
@@ -222,10 +265,10 @@ class ShaderRenderer {
     
     try {
       this.createProgram(vertexShader, fragmentShaderSource);
+      return true;
     } catch (error) {
       console.error('Shader compilation failed:', error);
-      // Fallback to default shader
-      this.initDefaultShader();
+      throw new Error('Shader compilation failed: ' + error.message);
     }
   }
   
@@ -271,6 +314,17 @@ class ShaderRenderer {
     // Get uniform locations
     this.timeLocation = gl.getUniformLocation(program, 'time');
     this.resolutionLocation = gl.getUniformLocation(program, 'resolution');
+    
+    // Create buffers if needed
+    if (!this.positionBuffer) {
+      this.createBuffers();
+    } else {
+      // Re-bind position attribute
+      const positionLocation = gl.getAttribLocation(this.program, 'position');
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+      gl.enableVertexAttribArray(positionLocation);
+      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+    }
   }
   
   // Create vertex buffers
@@ -287,8 +341,8 @@ class ShaderRenderer {
       -1.0,  1.0
     ]);
     
-    const positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    this.positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
     
     const positionLocation = gl.getAttribLocation(this.program, 'position');
@@ -441,6 +495,12 @@ class ShaderGenerator {
       uniform float time;
       uniform vec2 resolution;
       
+      mat2 rot2(float a) {
+        float c = cos(a);
+        float s = sin(a);
+        return mat2(c, -s, s, c);
+      }
+      
       void main() {
         vec2 uv = (gl_FragCoord.xy / resolution.xy) * 2.0 - 1.0;
         uv.x *= resolution.x / resolution.y;
@@ -464,12 +524,6 @@ class ShaderGenerator {
         );
         
         gl_FragColor = vec4(color, 1.0);
-      }
-      
-      mat2 rot2(float a) {
-        float c = cos(a);
-        float s = sin(a);
-        return mat2(c, -s, s, c);
       }
     `;
   }
@@ -588,11 +642,5 @@ class ShaderGenerator {
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  // Load LZString library
-  const script = document.createElement('script');
-  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js';
-  script.onload = () => {
-    ShaderApp.init();
-  };
-  document.head.appendChild(script);
+  ShaderApp.init();
 });
