@@ -51,6 +51,7 @@ const ShaderApp = {
     
     document.getElementById('apply-shader').addEventListener('click', () => {
       this.applyEditedShader();
+      document.getElementById('editor-panel').classList.add('hidden');
     });
     
     document.getElementById('copy-link').addEventListener('click', () => {
@@ -65,20 +66,18 @@ const ShaderApp = {
     });
   },
   
-  // Handle window resizing
+  // Handle window resizing - make canvas truly fullscreen
   setupResizeHandler() {
-    window.addEventListener('resize', () => {
-      const canvasContainer = this.canvas.parentElement;
-      this.canvas.width = canvasContainer.clientWidth;
-      this.canvas.height = canvasContainer.clientHeight;
+    const resizeCanvas = () => {
+      this.canvas.width = window.innerWidth;
+      this.canvas.height = window.innerHeight;
       this.renderer.resize(this.canvas.width, this.canvas.height);
-    });
+    };
+    
+    window.addEventListener('resize', resizeCanvas);
     
     // Initial resize
-    const canvasContainer = this.canvas.parentElement;
-    this.canvas.width = canvasContainer.clientWidth;
-    this.canvas.height = canvasContainer.clientHeight;
-    this.renderer.resize(this.canvas.width, this.canvas.height);
+    resizeCanvas();
   },
   
   // Generate a new random shader
@@ -162,16 +161,16 @@ const ShaderApp = {
     requestAnimationFrame(animate);
   },
   
-  // Display notification
+  // Display notification with macOS style
   showNotification(message, type = 'info') {
     const notification = document.getElementById('notification');
     notification.textContent = message;
     notification.className = 'notification show';
     
     if (type === 'error') {
-      notification.style.backgroundColor = 'rgba(180, 30, 30, 0.8)';
+      notification.classList.add('error');
     } else {
-      notification.style.backgroundColor = 'rgba(30, 30, 30, 0.8)';
+      notification.classList.remove('error');
     }
     
     setTimeout(() => {
